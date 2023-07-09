@@ -1,0 +1,72 @@
+name: build-for-nx508j-self-hosted
+
+on: workflow_dispatch
+
+jobs:
+  build-for-nx508j-self-hosted:
+    runs-on: self-hosted
+    steps:
+      - name: Setting up Build Directories
+        run: |
+          mkdir ~/bin
+          mkdir -p ~/android/lineage
+          cd ~/android/lineage
+          
+      - name: Installing Dependencies from Apt
+        run: |
+          sudo apt-get install openjdk-8-jdk libwxgtk3.0-gtk3-dev bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev git curl
+          
+      - name: Installing "repo" Tool
+        run: |
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          
+      - name: Authenticating "repo" with GitHub Account
+        run: |
+          git config --global user.email "2402776722@qq.com"
+          git config --global user.name "Fixa-six"
+          
+      - name: Enabling Caching (not sure)
+        run: |
+          export USE_CCACHE=1
+          export CCACHE_EXEC=/usr/bin/ccache
+          ccache -M 25G
+          
+      - name: Setting Up Local Repo
+        run: |
+          ~/bin/repo init -u https://github.com/LineageOS/android.git -b lineage-18.1 --git-lfs
+          ~/bin/repo sync
+          
+      - name: Setting Up Build Environment
+        run: |
+          mkdir -p device/nubia kernel/nubia vendor/nubia
+          git clone https://github.com/JackLI9/android_device_nubia_nx508j -b staging/lineage-18.1 device/nubia/nx508j
+          git clone https://github.com/JackLI9/android_vendor_nubia_nx508j -b staging/lineage-18.1 vendor/nubia/nx508j
+          git clone https://github.com/JackLI9/android_kernel_nubia_msm8994 -b staging/lineage-18.1 kernel/nubia/msm8994
+          git clone https://github.com/LineageOS/android_hardware_sony_timekeep -b lineage-18.1 hardware/sony/timekeep
+          source build/envsetup.sh
+          lunch lineage_nx508j-userdebug
+          
+      - name: Starting Build Process
+        run: |
+          croot && mka bacon
+      
+      - name: Get current time
+        uses: srfrnk/current-time@master
+        id: current-time
+        with:
+          format: DD-MM-YYYY
+      
+      - name: Uploading Build to Releases
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "Auto Build ${{ steps.current-time.outputs.formattedTime }}"
+          tag_name: v1.0
+          prerelease: false
+          body: |
+            This is an Automatic Release by GitHub Actions.
+          files: |
+            $OUT/recovery.img
+            $OUT/lineage-*-nx508j.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
